@@ -18,9 +18,9 @@ It works anywhere Obsidian renders a local video: notes, Canvas, embedded previe
 
 
 <video src="https://github.com/user-attachments/assets/8de959e8-6454-4fc1-a6af-4618f5b8fc2b" muted autoplay loop playsinline width="100%"></video>
-
+<!--
 [![Video Titel](https://img.youtube.com/vi/ni9dPoO59nE/maxresdefault.jpg)](https://www.youtube.com/watch?v=ni9dPoO59nE)
-
+-->
 ## Features
 
 - **Horizontal scrubbing** — drag left/right to seek through the video, with an adjustable sensitivity slider so you can tune how far a full sweep travels.
