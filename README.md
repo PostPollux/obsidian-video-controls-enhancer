@@ -1,7 +1,9 @@
 # VideoControlsEnhancer
 
-<!-- Hero video placeholder: replace `assets/hero.mp4` with your recording once it's ready. -->
-<video src="assets/hero.mp4" muted autoplay loop playsinline width="100%"></video>
+![Demo](https://github.com/user-attachments/assets/8de959e8-6454-4fc1-a6af-4618f5b8fc2b)
+
+
+<video src="https://github.com/user-attachments/assets/8de959e8-6454-4fc1-a6af-4618f5b8fc2b" muted autoplay loop playsinline width="100%"></video>
 
 [![Obsidian](https://img.shields.io/badge/Obsidian-1.12.7+-purple.svg)](https://obsidian.md)
 [![Release](https://img.shields.io/github/v/release/PostPollux/obsidian-video-controls-enhancer)](https://github.com/PostPollux/obsidian-video-controls-enhancer/releases)
