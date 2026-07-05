@@ -104,12 +104,20 @@ export default class VideoControlsEnhancer extends Plugin {
             return `${m}:${sec.toString().padStart(2, '0')}`;
         };
 
+        const supportsPopover = typeof HTMLElement !== 'undefined' && 'popover' in HTMLElement.prototype;
+
         const showOverlay = (x: number, y: number, text: string) => {
             if (overlayTimer) { window.clearTimeout(overlayTimer); overlayTimer = null; }
             if (!overlayEl) {
                 overlayEl = document.createElement('div');
                 overlayEl.className = 'vce-overlay';
+                if (supportsPopover) {
+                    overlayEl.popover = 'manual';
+                }
                 document.body.appendChild(overlayEl);
+            }
+            if (supportsPopover && !overlayEl.matches(':popover-open')) {
+                try { overlayEl.showPopover(); } catch { /* ignore */ }
             }
             overlayEl.classList.remove('vce-overlay-fade');
             overlayEl.textContent = text;
@@ -118,6 +126,9 @@ export default class VideoControlsEnhancer extends Plugin {
             overlayTimer = window.setTimeout(() => {
                 overlayEl?.classList.add('vce-overlay-fade');
                 overlayTimer = window.setTimeout(() => {
+                    if (overlayEl?.hidePopover) {
+                        try { overlayEl.hidePopover(); } catch { /* ignore */ }
+                    }
                     overlayEl?.remove();
                     overlayEl = null;
                     overlayTimer = null;
@@ -130,6 +141,9 @@ export default class VideoControlsEnhancer extends Plugin {
             if (overlayEl) {
                 overlayEl.classList.add('vce-overlay-fade');
                 overlayTimer = window.setTimeout(() => {
+                    if (overlayEl?.hidePopover) {
+                        try { overlayEl.hidePopover(); } catch { /* ignore */ }
+                    }
                     overlayEl?.remove();
                     overlayEl = null;
                     overlayTimer = null;
