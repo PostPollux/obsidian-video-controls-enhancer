@@ -1,13 +1,19 @@
 import { Plugin } from 'obsidian';
 
 interface PluginSettings {
+    doubleTapEnabled: boolean;
     doubleTapSeconds: number;
+    scrubEnabled: boolean;
     scrubSensitivity: number;
+    volumeEnabled: boolean;
 }
 
 const DEFAULT_SETTINGS: PluginSettings = {
+    doubleTapEnabled: true,
     doubleTapSeconds: 10,
-    scrubSensitivity: 30
+    scrubEnabled: true,
+    scrubSensitivity: 30,
+    volumeEnabled: true,
 };
 
 export default class VideoControlsEnhancer extends Plugin {
@@ -123,6 +129,7 @@ export default class VideoControlsEnhancer extends Plugin {
         };
 
         const doDoubleTap = (clientX: number, clientY: number) => {
+            if (!this.settings.doubleTapEnabled) return false;
             const now = Date.now();
             if (now - lastTapTime < 400) {
                 const rect = wrapper.getBoundingClientRect();
@@ -143,6 +150,7 @@ export default class VideoControlsEnhancer extends Plugin {
         };
 
         const beginDrag = (x: number, y: number) => {
+            if (!this.settings.scrubEnabled && !this.settings.volumeEnabled) return;
             dragMode = 'none';
             dragStartX = x;
             dragStartY = y;
@@ -157,7 +165,17 @@ export default class VideoControlsEnhancer extends Plugin {
 
             if (dragMode === 'none') {
                 if (Math.abs(deltaX) < 5 && Math.abs(deltaY) < 5) return;
-                dragMode = Math.abs(deltaX) >= Math.abs(deltaY) ? 'scrub' : 'volume';
+                const preferScrub = Math.abs(deltaX) >= Math.abs(deltaY);
+                if (preferScrub && this.settings.scrubEnabled) {
+                    dragMode = 'scrub';
+                } else if (!preferScrub && this.settings.volumeEnabled) {
+                    dragMode = 'volume';
+                } else if (preferScrub && this.settings.volumeEnabled) {
+                    dragMode = 'volume';
+                } else if (!preferScrub && this.settings.scrubEnabled) {
+                    dragMode = 'scrub';
+                }
+                if (dragMode === 'none') return;
             }
 
             if (dragMode === 'scrub') {
@@ -244,15 +262,39 @@ class VideoControlsSettingTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
 
+        new Setting(containerEl).setName('Double tap').setHeading();
+
         new Setting(containerEl)
-            .setName('Double tap jump')
-            .setDesc('Amount of seconds to jump back or forth on double tap.')
+            .setName('Enable double tap')
+            .addToggle(toggle => {
+                toggle.setValue(this.plugin.settings.doubleTapEnabled)
+                    .onChange(async (value) => {
+                        this.plugin.settings.doubleTapEnabled = value;
+                        await this.plugin.saveSettings();
+                    });
+            });
+
+        new Setting(containerEl)
+            .setName('Jump seconds')
+            .setDesc('Amount of seconds to jump forward or backward.')
             .addSlider(slider => {
                 slider.setLimits(1, 30, 1)
                     .setValue(this.plugin.settings.doubleTapSeconds)
                     .setDynamicTooltip()
                     .onChange(async (value) => {
                         this.plugin.settings.doubleTapSeconds = value;
+                        await this.plugin.saveSettings();
+                    });
+            });
+
+        new Setting(containerEl).setName('Scrub (horizontal drag)').setHeading();
+
+        new Setting(containerEl)
+            .setName('Enable scrubbing')
+            .addToggle(toggle => {
+                toggle.setValue(this.plugin.settings.scrubEnabled)
+                    .onChange(async (value) => {
+                        this.plugin.settings.scrubEnabled = value;
                         await this.plugin.saveSettings();
                     });
             });
@@ -266,6 +308,18 @@ class VideoControlsSettingTab extends PluginSettingTab {
                     .setDynamicTooltip()
                     .onChange(async (value) => {
                         this.plugin.settings.scrubSensitivity = value;
+                        await this.plugin.saveSettings();
+                    });
+            });
+
+        new Setting(containerEl).setName('Volume (vertical drag)').setHeading();
+
+        new Setting(containerEl)
+            .setName('Enable volume control')
+            .addToggle(toggle => {
+                toggle.setValue(this.plugin.settings.volumeEnabled)
+                    .onChange(async (value) => {
+                        this.plugin.settings.volumeEnabled = value;
                         await this.plugin.saveSettings();
                     });
             });
