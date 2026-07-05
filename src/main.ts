@@ -73,9 +73,12 @@ export default class VideoControlsEnhancer extends Plugin {
         wrapper.appendChild(video);
 
         let lastTapTime = 0;
-        let scrubStartX = 0;
-        let scrubStartTime = 0;
-        let isScrubbing = false;
+        let dragMode: 'none' | 'scrub' | 'volume' = 'none';
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let dragStartTime = 0;
+        let dragStartVolume = 0;
+        let isDragging = false;
         let overlayEl: HTMLDivElement | null = null;
         let overlayTimer: number | null = null;
 
@@ -139,45 +142,65 @@ export default class VideoControlsEnhancer extends Plugin {
             return false;
         };
 
-        const beginScrub = (clientX: number) => {
-            scrubStartX = clientX;
-            scrubStartTime = video.currentTime;
-            isScrubbing = false;
+        const beginDrag = (x: number, y: number) => {
+            dragMode = 'none';
+            dragStartX = x;
+            dragStartY = y;
+            dragStartTime = video.currentTime;
+            dragStartVolume = video.volume;
+            isDragging = false;
         };
 
-        const updateScrub = (clientX: number, clientY: number) => {
-            const deltaX = clientX - scrubStartX;
-            if (Math.abs(deltaX) < 5) return;
-            isScrubbing = true;
-            const rect = wrapper.getBoundingClientRect();
-            const sensitivity = this.settings.scrubSensitivity / 100;
-            const timeChange = (deltaX / rect.width) * video.duration * sensitivity;
-            const newTime = Math.max(0, Math.min(video.duration, scrubStartTime + timeChange));
-            video.currentTime = newTime;
-            showOverlay(clientX, clientY, formatTime(newTime));
+        const updateDrag = (clientX: number, clientY: number) => {
+            const deltaX = clientX - dragStartX;
+            const deltaY = clientY - dragStartY;
+
+            if (dragMode === 'none') {
+                if (Math.abs(deltaX) < 5 && Math.abs(deltaY) < 5) return;
+                dragMode = Math.abs(deltaX) >= Math.abs(deltaY) ? 'scrub' : 'volume';
+            }
+
+            if (dragMode === 'scrub') {
+                isDragging = true;
+                const rect = wrapper.getBoundingClientRect();
+                const sensitivity = this.settings.scrubSensitivity / 100;
+                const timeChange = (deltaX / rect.width) * video.duration * sensitivity;
+                const newTime = Math.max(0, Math.min(video.duration, dragStartTime + timeChange));
+                video.currentTime = newTime;
+                showOverlay(clientX, clientY, formatTime(newTime));
+            } else {
+                isDragging = true;
+                const rect = wrapper.getBoundingClientRect();
+                const newVolume = Math.max(0, Math.min(1, dragStartVolume - (deltaY / rect.height) * 2));
+                video.volume = newVolume;
+                const pct = Math.round(newVolume * 100);
+                showOverlay(clientX, clientY, `\uD83D\uDD0A ${pct}%`);
+            }
         };
 
-        const endScrub = () => {
-            if (isScrubbing) {
+        const endDrag = () => {
+            if (isDragging) {
                 lastTapTime = 0;
                 fadeOverlay();
             }
-            isScrubbing = false;
+            dragMode = 'none';
+            isDragging = false;
         };
 
         wrapper.addEventListener('mousedown', (e: MouseEvent) => {
-            beginScrub(e.clientX);
+            beginDrag(e.clientX, e.clientY);
         });
 
         wrapper.addEventListener('mousemove', (e: MouseEvent) => {
             if (e.buttons !== 1) return;
-            updateScrub(e.clientX, e.clientY);
+            updateDrag(e.clientX, e.clientY);
         });
 
-        wrapper.addEventListener('mouseup', endScrub);
+        wrapper.addEventListener('mouseup', endDrag);
         wrapper.addEventListener('mouseleave', () => {
-            if (isScrubbing) fadeOverlay();
-            isScrubbing = false;
+            if (isDragging) fadeOverlay();
+            dragMode = 'none';
+            isDragging = false;
         });
 
         wrapper.addEventListener('click', (e: MouseEvent) => {
@@ -194,16 +217,16 @@ export default class VideoControlsEnhancer extends Plugin {
                 e.preventDefault();
                 return;
             }
-            beginScrub(t.clientX);
+            beginDrag(t.clientX, t.clientY);
         }, { passive: false });
 
         wrapper.addEventListener('touchmove', (e: TouchEvent) => {
             const t = e.touches[0];
             if (!t) return;
-            updateScrub(t.clientX, t.clientY);
+            updateDrag(t.clientX, t.clientY);
         }, { passive: true });
 
-        wrapper.addEventListener('touchend', endScrub);
+        wrapper.addEventListener('touchend', endDrag);
     }
 }
 
