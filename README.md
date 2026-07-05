@@ -1,92 +1,60 @@
-# Obsidian Sample Plugin
+# VideoControlsEnhancer
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+<!-- Hero video placeholder: replace `assets/hero.mp4` with your recording once it's ready. -->
+<video src="assets/hero.mp4" muted autoplay loop playsinline width="100%"></video>
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+[![Obsidian](https://img.shields.io/badge/Obsidian-1.12.7+-purple.svg)](https://obsidian.md)
+[![Release](https://img.shields.io/github/v/release/PostPollux/obsidian-video-controls-enhancer)](https://github.com/PostPollux/obsidian-video-controls-enhancer/releases)
+[![Issues](https://img.shields.io/github/issues/PostPollux/obsidian-video-controls-enhancer)](https://github.com/PostPollux/obsidian-video-controls-enhancer/issues)
+[![Last Commit](https://img.shields.io/github/last-commit/PostPollux/obsidian-video-controls-enhancer)](https://github.com/PostPollux/obsidian-video-controls-enhancer/commits/main)
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
+---
 
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open modal (simple)" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and outputs a Notice on click.
-- Registers a global interval which logs 'setInterval' to the console.
+> [!NOTE]
+> This plugin enhances the native HTML5 `<video>` player used by Obsidian for **local video files**. It does **not** affect embedded third-party players (e.g. YouTube, Vimeo).
 
-## First time developing plugins?
+## Touch-first video controls for Obsidian
 
-Quick starting guide for new plugin devs:
+**VideoControlsEnhancer** supercharges Obsidian's built-in video player with gesture-driven playback controls inspired by modern mobile video apps. Scrub through a clip by dragging horizontally, adjust volume by dragging vertically, jump in configurable steps with a double tap, and fast-forward by holding down. Every action is accompanied by a lightweight on-screen overlay so you always see what's happening — no precision aiming at tiny progress bars required.
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `src/main.ts` to `main.js`.
-- Make changes to `src/main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+It works anywhere Obsidian renders a local video: notes, Canvas, embedded previews, and fullscreen mode on both desktop and mobile.
 
-## Releasing new releases
+## Features
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+- **Horizontal scrubbing** — drag left/right to seek through the video, with an adjustable sensitivity slider so you can tune how far a full sweep travels.
+- **Vertical volume control** — drag up/down anywhere on the video to change the volume; the overlay shows the current percentage and a speaker icon.
+- **Double tap to jump** — a double tap on the right half jumps forward, on the left half jumps backward, by a configurable number of seconds (1–30).
+- **Long press to fast-forward** — press and hold without dragging to play at an increased rate (1.5×–4×); release to return to normal speed. The trigger delay is configurable (200–1000 ms).
+- **On-screen overlay** — each gesture shows a transient overlay (time, `+/-seconds`, `Nx` speed, or volume %) near the touch point.
+- **Mobile fullscreen controls** — optionally shifts the native fullscreen progress bar/controls up a little so they don't sit in the system gesture zone, and blocks touch/mouse events from leaking through to the canvas behind a fullscreen video.
+- **Works everywhere** — applies to every `<video>` element rendered by Obsidian, including dynamically inserted ones (via a `MutationObserver`), in notes, Canvas, and fullscreen.
+- **Desktop and mobile** — tuned to behave well with touch gestures.
+- **Fully configurable** — every feature can be toggled on or off independently in settings.
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+## Installation
 
-## Adding your plugin to the community plugin list
+### Community plugins (recommended)
 
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+1. Open Obsidian **Settings → Community plugins**.
+2. Click **Browse** and search for **VideoControlsEnhancer**.
+3. Click **Install**, then **Enable**.
 
-## How to use
+### Manual installation
 
-- Clone this repo.
-- Make sure your NodeJS is at least v18 (`node --version`).
-- `npm i` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
+1. Download `main.js`, `manifest.json`, and `styles.css` (if present) from the latest [GitHub release](https://github.com/PostPollux/obsidian-video-controls-enhancer/releases).
+2. Copy them into:
+   ```
+   <your-vault>/.obsidian/plugins/video-controls-enhancer/
+   ```
+3. Reload Obsidian.
+4. Enable the plugin in **Settings → Community plugins**.
 
-## Manually installing the plugin
+## Compatibility
 
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
+- Requires Obsidian **1.12.7** or newer.
+- Works on desktop and mobile.
+- Affects only the native HTML5 video player for local files. Embedded players such as YouTube are not modified.
 
-## Improve code quality with eslint
+## Contributing
 
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code.
-- This project already has eslint preconfigured, you can invoke a check by running`npm run lint`
-- Together with a custom eslint [plugin](https://github.com/obsidianmd/eslint-plugin) for Obsidan specific code guidelines.
-- A GitHub action is preconfigured to automatically lint every commit on all branches.
-
-## Funding URL
-
-You can include funding URLs where people who use your plugin can financially support it.
-
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
-
-```json
-{
-	"fundingUrl": "https://buymeacoffee.com"
-}
-```
-
-If you have multiple URLs, you can also do:
-
-```json
-{
-	"fundingUrl": {
-		"Buy Me a Coffee": "https://buymeacoffee.com",
-		"GitHub Sponsor": "https://github.com/sponsors",
-		"Patreon": "https://www.patreon.com/"
-	}
-}
-```
-
-## API Documentation
-
-See https://docs.obsidian.md
+Issues and pull requests are welcome: [GitHub Issues](https://github.com/PostPollux/obsidian-video-controls-enhancer/issues)
