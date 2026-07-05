@@ -1,10 +1,5 @@
 # VideoControlsEnhancer
 
-![Demo](https://github.com/user-attachments/assets/8de959e8-6454-4fc1-a6af-4618f5b8fc2b)
-
-
-<video src="https://github.com/user-attachments/assets/8de959e8-6454-4fc1-a6af-4618f5b8fc2b" muted autoplay loop playsinline width="100%"></video>
-
 [![Obsidian](https://img.shields.io/badge/Obsidian-1.12.7+-purple.svg)](https://obsidian.md)
 [![Release](https://img.shields.io/github/v/release/PostPollux/obsidian-video-controls-enhancer)](https://github.com/PostPollux/obsidian-video-controls-enhancer/releases)
 [![Issues](https://img.shields.io/github/issues/PostPollux/obsidian-video-controls-enhancer)](https://github.com/PostPollux/obsidian-video-controls-enhancer/issues)
@@ -20,6 +15,11 @@
 **VideoControlsEnhancer** supercharges Obsidian's built-in video player with gesture-driven playback controls inspired by modern mobile video apps. Scrub through a clip by dragging horizontally, adjust volume by dragging vertically, jump in configurable steps with a double tap, and fast-forward by holding down. Every action is accompanied by a lightweight on-screen overlay so you always see what's happening — no precision aiming at tiny progress bars required.
 
 It works anywhere Obsidian renders a local video: notes, Canvas, embedded previews, and fullscreen mode on both desktop and mobile.
+
+
+<video src="https://github.com/user-attachments/assets/8de959e8-6454-4fc1-a6af-4618f5b8fc2b" muted autoplay loop playsinline width="100%"></video>
+
+[![Video Titel](https://img.youtube.com/vi/ni9dPoO59nE/maxresdefault.jpg)](https://www.youtube.com/watch?v=ni9dPoO59nE)
 
 ## Features
 
