@@ -1,114 +1,160 @@
-import {
-	Editor,
-	MarkdownView,
-	MarkdownFileInfo,
-	Modal,
-	Notice,
-	Plugin,
-} from 'obsidian';
-import {
-	DEFAULT_SETTINGS,
-	MyPluginSettings,
-	SampleSettingTab,
-} from './settings';
+import { Plugin } from 'obsidian';
 
-// Remember to rename these classes and interfaces!
-
-export default class MyPlugin extends Plugin {
-	settings!: MyPluginSettings;
-
-	async onload() {
-		await this.loadSettings();
-
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', 'Sample', (_evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
-
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status bar text');
-
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: 'open-modal-simple',
-			name: 'Open modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			},
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'replace-selected',
-			name: 'Replace selected content',
-			editorCallback: (
-				editor: Editor,
-				_ctx: MarkdownView | MarkdownFileInfo,
-			) => {
-				editor.replaceSelection('Sample editor command');
-			},
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-modal-complex',
-			name: 'Open modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView =
-					this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-				return false;
-			},
-		});
-
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(activeDocument, 'click', (_evt: MouseEvent) => {
-			new Notice('Click');
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(
-			window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000),
-		);
-	}
-
-	onunload() {}
-
-	async loadSettings() {
-		this.settings = Object.assign(
-			{},
-			DEFAULT_SETTINGS,
-			(await this.loadData()) as Partial<MyPluginSettings>,
-		);
-	}
-
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
+interface PluginSettings {
+    doubleTapSeconds: number;
 }
 
-class SampleModal extends Modal {
-	onOpen() {
-		const { contentEl } = this;
-		contentEl.setText('Woah!');
-	}
+const DEFAULT_SETTINGS: PluginSettings = {
+    doubleTapSeconds: 10
+};
 
-	onClose() {
-		const { contentEl } = this;
-		contentEl.empty();
-	}
+export default class VideoControlsEnhancer extends Plugin {
+    settings!: PluginSettings;
+    private observer: MutationObserver | null = null;
+
+    async onload() {
+        await this.loadSettings();
+
+        this.registerMarkdownPostProcessor((element) => {
+            const videos = element.querySelectorAll<HTMLVideoElement>('video:not([data-vce])');
+            for (let i = 0; i < videos.length; i++) {
+                const video = videos[i];
+                if (video) this.enhanceVideo(video);
+            }
+        });
+
+        this.observer = new MutationObserver((mutations) => {
+            for (let mi = 0; mi < mutations.length; mi++) {
+                const m = mutations[mi];
+                if (!m) continue;
+                for (let ni = 0; ni < m.addedNodes.length; ni++) {
+                    const node = m.addedNodes[ni];
+                    if (node instanceof HTMLElement) {
+                        if (node.tagName === 'VIDEO' && !node.hasAttribute('data-vce')) {
+                            this.enhanceVideo(node as HTMLVideoElement);
+                        }
+                        const videos = node.querySelectorAll<HTMLVideoElement>('video:not([data-vce])');
+                        for (let i = 0; i < videos.length; i++) {
+                            const video = videos[i];
+                            if (video) this.enhanceVideo(video);
+                        }
+                    }
+                }
+            }
+        });
+
+        this.observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+        });
+        this.register(() => this.observer?.disconnect());
+
+        this.addSettingTab(new VideoControlsSettingTab(this.app, this));
+    }
+
+    async loadSettings() {
+        const data = (await this.loadData()) as Partial<PluginSettings>;
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
+    }
+
+    async saveSettings() {
+        await this.saveData(this.settings);
+    }
+
+    enhanceVideo(video: HTMLVideoElement) {
+        if (video.hasAttribute('data-vce')) return;
+        video.setAttribute('data-vce', 'true');
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'video-controls-enhancer-wrapper';
+        video.parentNode?.insertBefore(wrapper, video);
+        wrapper.appendChild(video);
+
+        let lastTapTime = 0;
+
+        const showOverlay = (clientX: number, clientY: number, text: string) => {
+            const old = document.querySelector('.vce-overlay');
+            if (old) old.remove();
+
+            const overlay = document.createElement('div');
+            overlay.className = 'vce-overlay';
+            overlay.textContent = text;
+            overlay.style.left = `${clientX}px`;
+            overlay.style.top = `${clientY}px`;
+
+            document.body.appendChild(overlay);
+
+            window.setTimeout(() => {
+                overlay.classList.add('vce-overlay-fade');
+                window.setTimeout(() => overlay.remove(), 400);
+            }, 400);
+        };
+
+        const handleDouble = (clientX: number, clientY: number) => {
+            const now = Date.now();
+
+            if (now - lastTapTime < 400) {
+                const rect = wrapper.getBoundingClientRect();
+                const isRightSide = clientX > rect.left + rect.width / 2;
+                const direction = isRightSide ? 1 : -1;
+                const seconds = this.settings.doubleTapSeconds;
+                video.currentTime = Math.max(0, Math.min(
+                    video.duration,
+                    video.currentTime + direction * seconds
+                ));
+
+                const sign = direction > 0 ? '+' : '-';
+                showOverlay(clientX, clientY, `${sign}${seconds}s`);
+                lastTapTime = 0;
+                return true;
+            }
+
+            lastTapTime = now;
+            return false;
+        };
+
+        video.addEventListener('click', (e: MouseEvent) => {
+            if (handleDouble(e.clientX, e.clientY)) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        });
+
+        video.addEventListener('touchstart', (e: TouchEvent) => {
+            const t = e.touches[0];
+            if (!t) return;
+            if (handleDouble(t.clientX, t.clientY)) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+    }
+}
+
+import { App, PluginSettingTab, Setting } from 'obsidian';
+
+class VideoControlsSettingTab extends PluginSettingTab {
+    plugin: VideoControlsEnhancer;
+
+    constructor(app: App, plugin: VideoControlsEnhancer) {
+        super(app, plugin);
+        this.plugin = plugin;
+    }
+
+    display(): void {
+        const { containerEl } = this;
+        containerEl.empty();
+
+        new Setting(containerEl)
+            .setName('Double tap jump')
+            .setDesc('Amount of seconds to jump back or forth on double tap.')
+            .addSlider(slider => {
+                slider.setLimits(1, 30, 1)
+                    .setValue(this.plugin.settings.doubleTapSeconds)
+                    .setDynamicTooltip()
+                    .onChange(async (value) => {
+                        this.plugin.settings.doubleTapSeconds = value;
+                        await this.plugin.saveSettings();
+                    });
+            });
+    }
 }
