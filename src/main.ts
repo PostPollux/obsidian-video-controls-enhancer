@@ -2,10 +2,12 @@ import { Plugin } from 'obsidian';
 
 interface PluginSettings {
     doubleTapSeconds: number;
+    scrubSensitivity: number;
 }
 
 const DEFAULT_SETTINGS: PluginSettings = {
-    doubleTapSeconds: 10
+    doubleTapSeconds: 10,
+    scrubSensitivity: 30
 };
 
 export default class VideoControlsEnhancer extends Plugin {
@@ -71,28 +73,54 @@ export default class VideoControlsEnhancer extends Plugin {
         wrapper.appendChild(video);
 
         let lastTapTime = 0;
+        let scrubStartX = 0;
+        let scrubStartTime = 0;
+        let isScrubbing = false;
+        let overlayEl: HTMLDivElement | null = null;
+        let overlayTimer: number | null = null;
 
-        const showOverlay = (clientX: number, clientY: number, text: string) => {
-            const old = document.querySelector('.vce-overlay');
-            if (old) old.remove();
+        const formatTime = (s: number): string => {
+            if (!isFinite(s) || s <= 0) return '0:00';
+            const m = Math.floor(s / 60);
+            const sec = Math.floor(s % 60);
+            return `${m}:${sec.toString().padStart(2, '0')}`;
+        };
 
-            const overlay = document.createElement('div');
-            overlay.className = 'vce-overlay';
-            overlay.textContent = text;
-            overlay.style.left = `${clientX}px`;
-            overlay.style.top = `${clientY}px`;
-
-            document.body.appendChild(overlay);
-
-            window.setTimeout(() => {
-                overlay.classList.add('vce-overlay-fade');
-                window.setTimeout(() => overlay.remove(), 400);
+        const showOverlay = (x: number, y: number, text: string) => {
+            if (overlayTimer) { window.clearTimeout(overlayTimer); overlayTimer = null; }
+            if (!overlayEl) {
+                overlayEl = document.createElement('div');
+                overlayEl.className = 'vce-overlay';
+                document.body.appendChild(overlayEl);
+            }
+            overlayEl.classList.remove('vce-overlay-fade');
+            overlayEl.textContent = text;
+            overlayEl.style.left = `${x}px`;
+            overlayEl.style.top = `${y}px`;
+            overlayTimer = window.setTimeout(() => {
+                overlayEl?.classList.add('vce-overlay-fade');
+                overlayTimer = window.setTimeout(() => {
+                    overlayEl?.remove();
+                    overlayEl = null;
+                    overlayTimer = null;
+                }, 400);
             }, 400);
         };
 
-        const handleDouble = (clientX: number, clientY: number) => {
-            const now = Date.now();
+        const fadeOverlay = () => {
+            if (overlayTimer) { window.clearTimeout(overlayTimer); overlayTimer = null; }
+            if (overlayEl) {
+                overlayEl.classList.add('vce-overlay-fade');
+                overlayTimer = window.setTimeout(() => {
+                    overlayEl?.remove();
+                    overlayEl = null;
+                    overlayTimer = null;
+                }, 400);
+            }
+        };
 
+        const doDoubleTap = (clientX: number, clientY: number) => {
+            const now = Date.now();
             if (now - lastTapTime < 400) {
                 const rect = wrapper.getBoundingClientRect();
                 const isRightSide = clientX > rect.left + rect.width / 2;
@@ -102,31 +130,80 @@ export default class VideoControlsEnhancer extends Plugin {
                     video.duration,
                     video.currentTime + direction * seconds
                 ));
-
                 const sign = direction > 0 ? '+' : '-';
                 showOverlay(clientX, clientY, `${sign}${seconds}s`);
                 lastTapTime = 0;
                 return true;
             }
-
             lastTapTime = now;
             return false;
         };
 
-        video.addEventListener('click', (e: MouseEvent) => {
-            if (handleDouble(e.clientX, e.clientY)) {
+        const beginScrub = (clientX: number) => {
+            scrubStartX = clientX;
+            scrubStartTime = video.currentTime;
+            isScrubbing = false;
+        };
+
+        const updateScrub = (clientX: number, clientY: number) => {
+            const deltaX = clientX - scrubStartX;
+            if (Math.abs(deltaX) < 5) return;
+            isScrubbing = true;
+            const rect = wrapper.getBoundingClientRect();
+            const sensitivity = this.settings.scrubSensitivity / 100;
+            const timeChange = (deltaX / rect.width) * video.duration * sensitivity;
+            const newTime = Math.max(0, Math.min(video.duration, scrubStartTime + timeChange));
+            video.currentTime = newTime;
+            showOverlay(clientX, clientY, formatTime(newTime));
+        };
+
+        const endScrub = () => {
+            if (isScrubbing) {
+                lastTapTime = 0;
+                fadeOverlay();
+            }
+            isScrubbing = false;
+        };
+
+        wrapper.addEventListener('mousedown', (e: MouseEvent) => {
+            beginScrub(e.clientX);
+        });
+
+        wrapper.addEventListener('mousemove', (e: MouseEvent) => {
+            if (e.buttons !== 1) return;
+            updateScrub(e.clientX, e.clientY);
+        });
+
+        wrapper.addEventListener('mouseup', endScrub);
+        wrapper.addEventListener('mouseleave', () => {
+            if (isScrubbing) fadeOverlay();
+            isScrubbing = false;
+        });
+
+        wrapper.addEventListener('click', (e: MouseEvent) => {
+            if (doDoubleTap(e.clientX, e.clientY)) {
                 e.preventDefault();
                 e.stopPropagation();
             }
         });
 
-        video.addEventListener('touchstart', (e: TouchEvent) => {
+        wrapper.addEventListener('touchstart', (e: TouchEvent) => {
             const t = e.touches[0];
             if (!t) return;
-            if (handleDouble(t.clientX, t.clientY)) {
+            if (doDoubleTap(t.clientX, t.clientY)) {
                 e.preventDefault();
+                return;
             }
+            beginScrub(t.clientX);
         }, { passive: false });
+
+        wrapper.addEventListener('touchmove', (e: TouchEvent) => {
+            const t = e.touches[0];
+            if (!t) return;
+            updateScrub(t.clientX, t.clientY);
+        }, { passive: true });
+
+        wrapper.addEventListener('touchend', endScrub);
     }
 }
 
@@ -153,6 +230,19 @@ class VideoControlsSettingTab extends PluginSettingTab {
                     .setDynamicTooltip()
                     .onChange(async (value) => {
                         this.plugin.settings.doubleTapSeconds = value;
+                        await this.plugin.saveSettings();
+                    });
+            });
+
+        new Setting(containerEl)
+            .setName('Scrub sensitivity')
+            .setDesc('How much of the video is scrubbed when dragging across the full width. Lower = finer scrubbing.')
+            .addSlider(slider => {
+                slider.setLimits(10, 100, 5)
+                    .setValue(this.plugin.settings.scrubSensitivity)
+                    .setDynamicTooltip()
+                    .onChange(async (value) => {
+                        this.plugin.settings.scrubSensitivity = value;
                         await this.plugin.saveSettings();
                     });
             });

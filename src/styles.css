@@ -2,7 +2,7 @@
     position: relative;
     display: inline-block;
     width: 100%;
-    touch-action: manipulation;
+    touch-action: none;
     user-select: none;
     overflow: hidden;
 }
