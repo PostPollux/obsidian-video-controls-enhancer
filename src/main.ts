@@ -133,7 +133,7 @@ export default class VideoControlsEnhancer extends Plugin {
             if (!this.settings.doubleTapEnabled) return false;
             const now = Date.now();
             if (now - lastTapTime < 400) {
-                const rect = wrapper.getBoundingClientRect();
+                const rect = getVideoRect();
                 const isRightSide = clientX > rect.left + rect.width / 2;
                 const direction = isRightSide ? 1 : -1;
                 const seconds = this.settings.doubleTapSeconds;
@@ -182,7 +182,7 @@ export default class VideoControlsEnhancer extends Plugin {
             if (dragMode === 'scrub') {
                 isDragging = true;
                 justDragged = true;
-                const rect = wrapper.getBoundingClientRect();
+                const rect = getVideoRect();
                 const sensitivity = this.settings.scrubSensitivity / 100;
                 const timeChange = (deltaX / rect.width) * video.duration * sensitivity;
                 const newTime = Math.max(0, Math.min(video.duration, dragStartTime + timeChange));
@@ -191,7 +191,7 @@ export default class VideoControlsEnhancer extends Plugin {
             } else {
                 isDragging = true;
                 justDragged = true;
-                const rect = wrapper.getBoundingClientRect();
+                const rect = getVideoRect();
                 const newVolume = Math.max(0, Math.min(1, dragStartVolume - (deltaY / rect.height) * 2));
                 video.volume = newVolume;
                 const pct = Math.round(newVolume * 100);
@@ -209,8 +209,15 @@ export default class VideoControlsEnhancer extends Plugin {
         };
 
         const isInControls = (clientY: number): boolean => {
-            const rect = wrapper.getBoundingClientRect();
+            const rect = getVideoRect();
             return (clientY - rect.top) > rect.height - 50;
+        };
+
+        const getVideoRect = () => {
+            if (document.fullscreenElement === video || document.fullscreenElement === wrapper) {
+                return { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+            }
+            return wrapper.getBoundingClientRect();
         };
 
         const togglePlayback = () => {
