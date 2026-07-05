@@ -158,7 +158,7 @@ export default class VideoControlsEnhancer extends Plugin {
             overlayEl.classList.remove('vce-overlay-fade');
             overlayEl.replaceChildren(typeof content === 'string' ? document.createTextNode(content) : content);
             overlayEl.style.left = `${x}px`;
-            overlayEl.style.top = `${y - 50}px`;
+            overlayEl.style.top = `${y - 60}px`;
             overlayTimer = window.setTimeout(() => {
                 overlayEl?.classList.add('vce-overlay-fade');
                 overlayTimer = window.setTimeout(() => {
