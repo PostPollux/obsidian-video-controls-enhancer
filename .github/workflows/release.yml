@@ -12,12 +12,12 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4   # v6 ist ok, aber v4 ist stabiler
+      - uses: actions/checkout@v4
 
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20        # 24 ist oft noch zu neu für manche Pakete
+          node-version: 20
           cache: 'npm'
 
       - name: Install dependencies
@@ -26,28 +26,14 @@ jobs:
       - name: Build plugin
         run: npm run build
 
-      - name: Check for styles.css
-        id: styles
-        run: |
-          if [ -f styles.css ]; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Create Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          tag="${GITHUB_REF#refs/tags/}"
-          
-          files="main.js manifest.json"
-          if [ "${{ steps.styles.outputs.exists }}" = "true" ]; then
-            files="$files styles.css"
-          fi
-
-          gh release create "$tag" \
-            --title "$tag" \
-            --draft \
-            --generate-notes \
-            $files
+        uses: softprops/action-gh-release@v2   # ← Das ist der wichtigste Wechsel!
+        with:
+          tag_name: ${{ github.ref }}
+          name: ${{ github.ref_name }}
+          draft: true
+          generate_release_notes: true
+          files: |
+            main.js
+            manifest.json
+            styles.css
