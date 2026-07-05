@@ -30,16 +30,16 @@
 }
 
 @media (pointer: coarse) {
-    video:fullscreen {
+    .vce-fs-controls video:fullscreen {
         padding-bottom: 40px;
         box-sizing: border-box;
     }
 
-    video:fullscreen::-webkit-media-controls-panel {
+    .vce-fs-controls video:fullscreen::-webkit-media-controls-panel {
         padding: 10px 16px 12px 16px;
     }
 
-    video:fullscreen::-webkit-media-controls-timeline::-webkit-slider-thumb {
+    .vce-fs-controls video:fullscreen::-webkit-media-controls-timeline::-webkit-slider-thumb {
         width: 48px;
         height: 48px;
     }

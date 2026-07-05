@@ -6,6 +6,7 @@ interface PluginSettings {
     scrubEnabled: boolean;
     scrubSensitivity: number;
     volumeEnabled: boolean;
+    fullscreenControlsEnabled: boolean;
 }
 
 const DEFAULT_SETTINGS: PluginSettings = {
@@ -14,6 +15,7 @@ const DEFAULT_SETTINGS: PluginSettings = {
     scrubEnabled: true,
     scrubSensitivity: 30,
     volumeEnabled: true,
+    fullscreenControlsEnabled: true,
 };
 
 export default class VideoControlsEnhancer extends Plugin {
@@ -22,6 +24,7 @@ export default class VideoControlsEnhancer extends Plugin {
 
     async onload() {
         await this.loadSettings();
+        this.applyFsControlsClass();
 
         this.registerMarkdownPostProcessor((element) => {
             const videos = element.querySelectorAll<HTMLVideoElement>('video:not([data-vce])');
@@ -67,6 +70,11 @@ export default class VideoControlsEnhancer extends Plugin {
 
     async saveSettings() {
         await this.saveData(this.settings);
+        this.applyFsControlsClass();
+    }
+
+    applyFsControlsClass() {
+        document.body.classList.toggle('vce-fs-controls', this.settings.fullscreenControlsEnabled);
     }
 
     enhanceVideo(video: HTMLVideoElement) {
@@ -348,6 +356,19 @@ class VideoControlsSettingTab extends PluginSettingTab {
                 toggle.setValue(this.plugin.settings.volumeEnabled)
                     .onChange(async (value) => {
                         this.plugin.settings.volumeEnabled = value;
+                        await this.plugin.saveSettings();
+                    });
+            });
+
+        new Setting(containerEl).setName('Mobile fullscreen controls').setHeading();
+
+        new Setting(containerEl)
+            .setName('Move controls up')
+            .setDesc('Moves the progress bar and buttons a bit up in full screen mode to avoid being in a critical zone where system gestures might interfere.')
+            .addToggle(toggle => {
+                toggle.setValue(this.plugin.settings.fullscreenControlsEnabled)
+                    .onChange(async (value) => {
+                        this.plugin.settings.fullscreenControlsEnabled = value;
                         await this.plugin.saveSettings();
                     });
             });
