@@ -1,7 +1,7 @@
 {
 	"id": "video-controls-enhancer",
 	"name": "VideoControlsEnhancer",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"minAppVersion": "1.12.7",
 	"description": "Supercharges html5 video player controls for local videos – horizontal scrubbing, vertical volume adjustment, configurable double tap, long press for fast forward and more! Note: Won't effect embeded players like e.g.the Youtube player.",
 	"author": "PostPollux",
