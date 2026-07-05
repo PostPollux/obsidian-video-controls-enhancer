@@ -85,6 +85,7 @@ export default class VideoControlsEnhancer extends Plugin {
         let dragStartTime = 0;
         let dragStartVolume = 0;
         let isDragging = false;
+        let justDragged = false;
         let overlayEl: HTMLDivElement | null = null;
         let overlayTimer: number | null = null;
 
@@ -128,7 +129,7 @@ export default class VideoControlsEnhancer extends Plugin {
             }
         };
 
-        const doDoubleTap = (clientX: number, clientY: number) => {
+        const tryDoubleTap = (clientX: number, clientY: number): boolean => {
             if (!this.settings.doubleTapEnabled) return false;
             const now = Date.now();
             if (now - lastTapTime < 400) {
@@ -180,6 +181,7 @@ export default class VideoControlsEnhancer extends Plugin {
 
             if (dragMode === 'scrub') {
                 isDragging = true;
+                justDragged = true;
                 const rect = wrapper.getBoundingClientRect();
                 const sensitivity = this.settings.scrubSensitivity / 100;
                 const timeChange = (deltaX / rect.width) * video.duration * sensitivity;
@@ -188,6 +190,7 @@ export default class VideoControlsEnhancer extends Plugin {
                 showOverlay(clientX, clientY, formatTime(newTime));
             } else {
                 isDragging = true;
+                justDragged = true;
                 const rect = wrapper.getBoundingClientRect();
                 const newVolume = Math.max(0, Math.min(1, dragStartVolume - (deltaY / rect.height) * 2));
                 video.volume = newVolume;
@@ -205,7 +208,18 @@ export default class VideoControlsEnhancer extends Plugin {
             isDragging = false;
         };
 
+        const isInControls = (clientY: number): boolean => {
+            const rect = wrapper.getBoundingClientRect();
+            return (clientY - rect.top) > rect.height - 50;
+        };
+
+        const togglePlayback = () => {
+            if (video.paused) { void video.play(); } else { video.pause(); }
+        };
+
         wrapper.addEventListener('mousedown', (e: MouseEvent) => {
+            if (isInControls(e.clientY)) return;
+            if (tryDoubleTap(e.clientX, e.clientY)) return;
             beginDrag(e.clientX, e.clientY);
         });
 
@@ -222,16 +236,23 @@ export default class VideoControlsEnhancer extends Plugin {
         });
 
         wrapper.addEventListener('click', (e: MouseEvent) => {
-            if (doDoubleTap(e.clientX, e.clientY)) {
-                e.preventDefault();
+            if (isInControls(e.clientY)) return;
+            if (justDragged) {
+                justDragged = false;
                 e.stopPropagation();
+                e.preventDefault();
+                return;
             }
-        });
+            e.stopPropagation();
+            e.preventDefault();
+            togglePlayback();
+        }, true);
 
         wrapper.addEventListener('touchstart', (e: TouchEvent) => {
             const t = e.touches[0];
             if (!t) return;
-            if (doDoubleTap(t.clientX, t.clientY)) {
+            if (isInControls(t.clientY)) return;
+            if (tryDoubleTap(t.clientX, t.clientY)) {
                 e.preventDefault();
                 return;
             }
