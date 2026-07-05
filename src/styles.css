@@ -34,6 +34,17 @@
     opacity: 0;
 }
 
+.vce-vol-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.vce-vol-label svg {
+    display: inline-block;
+    flex-shrink: 0;
+}
+
 @media (pointer: coarse) {
     .vce-fs-controls video:fullscreen {
         padding-bottom: 40px;

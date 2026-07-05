@@ -104,9 +104,45 @@ export default class VideoControlsEnhancer extends Plugin {
             return `${m}:${sec.toString().padStart(2, '0')}`;
         };
 
+        const buildVolumeLabel = (pct: number): HTMLElement => {
+            const wrap = document.createElement('span');
+            wrap.className = 'vce-vol-label';
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('viewBox', '0 0 24 24');
+            svg.setAttribute('width', '32');
+            svg.setAttribute('height', '32');
+            svg.setAttribute('aria-hidden', 'true');
+            const makeFill = (d: string, opacity = 1) => {
+                const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                p.setAttribute('d', d);
+                p.setAttribute('fill', 'currentColor');
+                p.setAttribute('opacity', String(opacity));
+                return p;
+            };
+            const makeStroke = (d: string) => {
+                const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                p.setAttribute('d', d);
+                p.setAttribute('fill', 'none');
+                p.setAttribute('stroke', 'currentColor');
+                p.setAttribute('stroke-width', '2');
+                p.setAttribute('stroke-linecap', 'round');
+                return p;
+            };
+            svg.appendChild(makeFill('M3 10v4a1 1 0 0 0 1 1h2l4 4V5L6 9H4a1 1 0 0 0-1 1z'));
+            if (pct === 0) {
+                svg.appendChild(makeStroke('M16 9l5 5M21 9l-5 5'));
+            } else {
+                if (pct > 0) svg.appendChild(makeStroke('M13 8a5 5 0 0 1 0 8'));
+                if (pct > 50) svg.appendChild(makeStroke('M15.5 5.5a9 9 0 0 1 0 13'));
+            }
+            wrap.appendChild(svg);
+            wrap.appendChild(document.createTextNode(` ${pct}%`));
+            return wrap;
+        };
+
         const supportsPopover = typeof HTMLElement !== 'undefined' && 'popover' in HTMLElement.prototype;
 
-        const showOverlay = (x: number, y: number, text: string) => {
+        const showOverlay = (x: number, y: number, content: string | HTMLElement) => {
             if (overlayTimer) { window.clearTimeout(overlayTimer); overlayTimer = null; }
             if (!overlayEl) {
                 overlayEl = document.createElement('div');
@@ -120,7 +156,7 @@ export default class VideoControlsEnhancer extends Plugin {
                 try { overlayEl.showPopover(); } catch { /* ignore */ }
             }
             overlayEl.classList.remove('vce-overlay-fade');
-            overlayEl.textContent = text;
+            overlayEl.replaceChildren(typeof content === 'string' ? document.createTextNode(content) : content);
             overlayEl.style.left = `${x}px`;
             overlayEl.style.top = `${y - 50}px`;
             overlayTimer = window.setTimeout(() => {
@@ -217,7 +253,7 @@ export default class VideoControlsEnhancer extends Plugin {
                 const newVolume = Math.max(0, Math.min(1, dragStartVolume - (deltaY / rect.height) * 2));
                 video.volume = newVolume;
                 const pct = Math.round(newVolume * 100);
-                showOverlay(clientX, clientY, `\uD83D\uDD0A ${pct}%`);
+                showOverlay(clientX, clientY, buildVolumeLabel(pct));
             }
         };
 
