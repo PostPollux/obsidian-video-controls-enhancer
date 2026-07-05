@@ -7,6 +7,7 @@ interface PluginSettings {
     scrubSensitivity: number;
     volumeEnabled: boolean;
     fullscreenControlsEnabled: boolean;
+    blockInputInFullscreen: boolean;
 }
 
 const DEFAULT_SETTINGS: PluginSettings = {
@@ -16,6 +17,7 @@ const DEFAULT_SETTINGS: PluginSettings = {
     scrubSensitivity: 30,
     volumeEnabled: true,
     fullscreenControlsEnabled: true,
+    blockInputInFullscreen: true,
 };
 
 export default class VideoControlsEnhancer extends Plugin {
@@ -85,6 +87,44 @@ export default class VideoControlsEnhancer extends Plugin {
         wrapper.className = 'video-controls-enhancer-wrapper';
         video.parentNode?.insertBefore(wrapper, video);
         wrapper.appendChild(video);
+
+        // When the video is fullscreen, events still bubble through the normal
+        // DOM tree (which includes the canvas). Stop propagation of input events
+        // on the wrapper so gestures don't reach the canvas behind it.
+        const blockedEvents = [
+            'mousedown', 'mousemove', 'mouseup', 'mouseleave',
+            'touchstart', 'touchmove', 'touchend', 'touchcancel',
+            'pointerdown', 'pointermove', 'pointerup', 'pointercancel',
+            'wheel', 'click', 'dblclick', 'dragstart', 'contextmenu',
+        ];
+        const inputBlocker = (e: Event) => { e.stopPropagation(); };
+        const attachInputBlockers = () => {
+            for (const type of blockedEvents) {
+                wrapper.addEventListener(type, inputBlocker, { capture: false });
+            }
+        };
+        const detachInputBlockers = () => {
+            for (const type of blockedEvents) {
+                wrapper.removeEventListener(type, inputBlocker);
+            }
+        };
+
+        const onFsChange = () => {
+            const fs = document.fullscreenElement;
+            const isFs = fs === video || fs === wrapper;
+            if (isFs && this.settings.blockInputInFullscreen) {
+                attachInputBlockers();
+            } else {
+                detachInputBlockers();
+            }
+        };
+        document.addEventListener('fullscreenchange', onFsChange);
+        document.addEventListener('webkitfullscreenchange', onFsChange);
+        this.register(() => {
+            document.removeEventListener('fullscreenchange', onFsChange);
+            document.removeEventListener('webkitfullscreenchange', onFsChange);
+            detachInputBlockers();
+        });
 
         let lastTapTime = 0;
         let dragMode: 'none' | 'scrub' | 'volume' = 'none';
@@ -419,6 +459,17 @@ class VideoControlsSettingTab extends PluginSettingTab {
                 toggle.setValue(this.plugin.settings.fullscreenControlsEnabled)
                     .onChange(async (value) => {
                         this.plugin.settings.fullscreenControlsEnabled = value;
+                        await this.plugin.saveSettings();
+                    });
+            });
+
+        new Setting(containerEl)
+            .setName('Block input in fullscreen')
+            .setDesc('Stops touch and mouse gestures on a fullscreen video from reaching the canvas or other elements behind it. If this is off the drag gestures will e.g. pan your canvas in the background, which you normaly don\`t want.')
+            .addToggle(toggle => {
+                toggle.setValue(this.plugin.settings.blockInputInFullscreen)
+                    .onChange(async (value) => {
+                        this.plugin.settings.blockInputInFullscreen = value;
                         await this.plugin.saveSettings();
                     });
             });
