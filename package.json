@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-sample-plugin",
+	"name": "video-controls-enhancer",
 	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"description": "Supercharges html5 video player controls for local videos – horizontal scrubbing, vertical volume adjustment, configurable double tap, long press for fast forward and more! Note: Won't effect embeded players like e.g.the Youtube player.",
 	"main": "main.js",
 	"type": "module",
 	"scripts": {
