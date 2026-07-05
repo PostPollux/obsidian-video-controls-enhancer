@@ -8,6 +8,9 @@ interface PluginSettings {
     volumeEnabled: boolean;
     fullscreenControlsEnabled: boolean;
     blockInputInFullscreen: boolean;
+    longPressEnabled: boolean;
+    longPressSpeed: number;
+    longPressDelay: number;
 }
 
 const DEFAULT_SETTINGS: PluginSettings = {
@@ -18,6 +21,9 @@ const DEFAULT_SETTINGS: PluginSettings = {
     volumeEnabled: true,
     fullscreenControlsEnabled: true,
     blockInputInFullscreen: true,
+    longPressEnabled: true,
+    longPressSpeed: 2,
+    longPressDelay: 400,
 };
 
 export default class VideoControlsEnhancer extends Plugin {
@@ -136,6 +142,9 @@ export default class VideoControlsEnhancer extends Plugin {
         let justDragged = false;
         let overlayEl: HTMLDivElement | null = null;
         let overlayTimer: number | null = null;
+        let longPressTimer: number | null = null;
+        let isLongPressing = false;
+        let justLongPressed = false;
 
         const formatTime = (s: number): string => {
             if (!isFinite(s) || s <= 0) return '0:00';
@@ -259,11 +268,13 @@ export default class VideoControlsEnhancer extends Plugin {
         };
 
         const updateDrag = (clientX: number, clientY: number) => {
+            if (isLongPressing) return;
             const deltaX = clientX - dragStartX;
             const deltaY = clientY - dragStartY;
 
             if (dragMode === 'none') {
                 if (Math.abs(deltaX) < 5 && Math.abs(deltaY) < 5) return;
+                cancelLongPressTimer();
                 const preferScrub = Math.abs(deltaX) >= Math.abs(deltaY);
                 if (preferScrub && this.settings.scrubEnabled) {
                     dragMode = 'scrub';
@@ -306,6 +317,33 @@ export default class VideoControlsEnhancer extends Plugin {
             isDragging = false;
         };
 
+        const startLongPressTimer = (x: number, y: number) => {
+            if (!this.settings.longPressEnabled) return;
+            cancelLongPressTimer();
+            longPressTimer = window.setTimeout(() => {
+                longPressTimer = null;
+                if (dragMode === 'none' && !isDragging) {
+                    isLongPressing = true;
+                    video.playbackRate = this.settings.longPressSpeed;
+                    showOverlay(x, y, `${this.settings.longPressSpeed}x`);
+                }
+            }, this.settings.longPressDelay);
+        };
+
+        const cancelLongPressTimer = () => {
+            if (longPressTimer) { window.clearTimeout(longPressTimer); longPressTimer = null; }
+        };
+
+        const endLongPress = () => {
+            cancelLongPressTimer();
+            if (isLongPressing) {
+                video.playbackRate = 1;
+                isLongPressing = false;
+                justLongPressed = true;
+                fadeOverlay();
+            }
+        };
+
         const isInControls = (clientY: number): boolean => {
             const rect = getVideoRect();
             return (clientY - rect.top) > rect.height - 50;
@@ -326,6 +364,7 @@ export default class VideoControlsEnhancer extends Plugin {
             if (isInControls(e.clientY)) return;
             if (tryDoubleTap(e.clientX, e.clientY)) return;
             beginDrag(e.clientX, e.clientY);
+            startLongPressTimer(e.clientX, e.clientY);
         });
 
         wrapper.addEventListener('mousemove', (e: MouseEvent) => {
@@ -333,17 +372,22 @@ export default class VideoControlsEnhancer extends Plugin {
             updateDrag(e.clientX, e.clientY);
         });
 
-        wrapper.addEventListener('mouseup', endDrag);
+        wrapper.addEventListener('mouseup', () => {
+            endDrag();
+            endLongPress();
+        });
         wrapper.addEventListener('mouseleave', () => {
             if (isDragging) fadeOverlay();
             dragMode = 'none';
             isDragging = false;
+            endLongPress();
         });
 
         wrapper.addEventListener('click', (e: MouseEvent) => {
             if (isInControls(e.clientY)) return;
-            if (justDragged) {
+            if (justDragged || justLongPressed) {
                 justDragged = false;
+                justLongPressed = false;
                 e.stopPropagation();
                 e.preventDefault();
                 return;
@@ -362,15 +406,23 @@ export default class VideoControlsEnhancer extends Plugin {
                 return;
             }
             beginDrag(t.clientX, t.clientY);
+            startLongPressTimer(t.clientX, t.clientY);
         }, { passive: false });
 
         wrapper.addEventListener('touchmove', (e: TouchEvent) => {
             const t = e.touches[0];
             if (!t) return;
+            if (isLongPressing) {
+                e.preventDefault();
+                return;
+            }
             updateDrag(t.clientX, t.clientY);
-        }, { passive: true });
+        }, { passive: false });
 
-        wrapper.addEventListener('touchend', endDrag);
+        wrapper.addEventListener('touchend', () => {
+            endDrag();
+            endLongPress();
+        });
     }
 }
 
@@ -446,6 +498,45 @@ class VideoControlsSettingTab extends PluginSettingTab {
                 toggle.setValue(this.plugin.settings.volumeEnabled)
                     .onChange(async (value) => {
                         this.plugin.settings.volumeEnabled = value;
+                        await this.plugin.saveSettings();
+                    });
+            });
+
+        new Setting(containerEl).setName('Long press (fast forward)').setHeading();
+
+        new Setting(containerEl)
+            .setName('Enable long press fast forward')
+            .setDesc('Press and hold without dragging to fast forward at increased speed. Release to return to normal speed.')
+            .addToggle(toggle => {
+                toggle.setValue(this.plugin.settings.longPressEnabled)
+                    .onChange(async (value) => {
+                        this.plugin.settings.longPressEnabled = value;
+                        await this.plugin.saveSettings();
+                    });
+            });
+
+        new Setting(containerEl)
+            .setName('Fast forward speed')
+            .setDesc('Playback speed while long pressing.')
+            .addSlider(slider => {
+                slider.setLimits(1.5, 4, 0.25)
+                    .setValue(this.plugin.settings.longPressSpeed)
+                    .setDynamicTooltip()
+                    .onChange(async (value) => {
+                        this.plugin.settings.longPressSpeed = value;
+                        await this.plugin.saveSettings();
+                    });
+            });
+
+        new Setting(containerEl)
+            .setName('Long press delay')
+            .setDesc('How long to hold (in milliseconds) before fast forward kicks in.')
+            .addSlider(slider => {
+                slider.setLimits(200, 1000, 50)
+                    .setValue(this.plugin.settings.longPressDelay)
+                    .setDynamicTooltip()
+                    .onChange(async (value) => {
+                        this.plugin.settings.longPressDelay = value;
                         await this.plugin.saveSettings();
                     });
             });
