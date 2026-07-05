@@ -426,7 +426,7 @@ export default class VideoControlsEnhancer extends Plugin {
     }
 }
 
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, SettingGroup } from 'obsidian';
 
 class VideoControlsSettingTab extends PluginSettingTab {
     plugin: VideoControlsEnhancer;
@@ -440,128 +440,143 @@ class VideoControlsSettingTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
 
-        new Setting(containerEl).setName('Double tap').setHeading();
-
-        new Setting(containerEl)
-            .setName('Enable double tap')
-            .addToggle(toggle => {
-                toggle.setValue(this.plugin.settings.doubleTapEnabled)
-                    .onChange(async (value) => {
-                        this.plugin.settings.doubleTapEnabled = value;
-                        await this.plugin.saveSettings();
+        new SettingGroup(containerEl)
+            .setHeading('Double tap')
+            .addSetting(setting => {
+                setting
+                    .setName('Enable double tap')
+                    .addToggle(toggle => {
+                        toggle.setValue(this.plugin.settings.doubleTapEnabled)
+                            .onChange(async (value) => {
+                                this.plugin.settings.doubleTapEnabled = value;
+                                await this.plugin.saveSettings();
+                            });
+                    });
+            })
+            .addSetting(setting => {
+                setting
+                    .setName('Jump seconds')
+                    .setDesc('Amount of seconds to jump forward or backward.')
+                    .addSlider(slider => {
+                        slider.setLimits(1, 30, 1)
+                            .setValue(this.plugin.settings.doubleTapSeconds)
+                            .setDynamicTooltip()
+                            .onChange(async (value) => {
+                                this.plugin.settings.doubleTapSeconds = value;
+                                await this.plugin.saveSettings();
+                            });
                     });
             });
 
-        new Setting(containerEl)
-            .setName('Jump seconds')
-            .setDesc('Amount of seconds to jump forward or backward.')
-            .addSlider(slider => {
-                slider.setLimits(1, 30, 1)
-                    .setValue(this.plugin.settings.doubleTapSeconds)
-                    .setDynamicTooltip()
-                    .onChange(async (value) => {
-                        this.plugin.settings.doubleTapSeconds = value;
-                        await this.plugin.saveSettings();
+        new SettingGroup(containerEl)
+            .setHeading('Scrub (horizontal drag)')
+            .addSetting(setting => {
+                setting
+                    .setName('Enable scrubbing')
+                    .addToggle(toggle => {
+                        toggle.setValue(this.plugin.settings.scrubEnabled)
+                            .onChange(async (value) => {
+                                this.plugin.settings.scrubEnabled = value;
+                                await this.plugin.saveSettings();
+                            });
+                    });
+            })
+            .addSetting(setting => {
+                setting
+                    .setName('Scrub sensitivity')
+                    .setDesc('How much of the video is scrubbed when dragging across the full width. Lower = finer scrubbing.')
+                    .addSlider(slider => {
+                        slider.setLimits(10, 100, 5)
+                            .setValue(this.plugin.settings.scrubSensitivity)
+                            .setDynamicTooltip()
+                            .onChange(async (value) => {
+                                this.plugin.settings.scrubSensitivity = value;
+                                await this.plugin.saveSettings();
+                            });
                     });
             });
 
-        new Setting(containerEl).setName('Scrub (horizontal drag)').setHeading();
-
-        new Setting(containerEl)
-            .setName('Enable scrubbing')
-            .addToggle(toggle => {
-                toggle.setValue(this.plugin.settings.scrubEnabled)
-                    .onChange(async (value) => {
-                        this.plugin.settings.scrubEnabled = value;
-                        await this.plugin.saveSettings();
+        new SettingGroup(containerEl)
+            .setHeading('Volume (vertical drag)')
+            .addSetting(setting => {
+                setting
+                    .setName('Enable volume control')
+                    .addToggle(toggle => {
+                        toggle.setValue(this.plugin.settings.volumeEnabled)
+                            .onChange(async (value) => {
+                                this.plugin.settings.volumeEnabled = value;
+                                await this.plugin.saveSettings();
+                            });
                     });
             });
 
-        new Setting(containerEl)
-            .setName('Scrub sensitivity')
-            .setDesc('How much of the video is scrubbed when dragging across the full width. Lower = finer scrubbing.')
-            .addSlider(slider => {
-                slider.setLimits(10, 100, 5)
-                    .setValue(this.plugin.settings.scrubSensitivity)
-                    .setDynamicTooltip()
-                    .onChange(async (value) => {
-                        this.plugin.settings.scrubSensitivity = value;
-                        await this.plugin.saveSettings();
+        new SettingGroup(containerEl)
+            .setHeading('Long press (fast forward)')
+            .addSetting(setting => {
+                setting
+                    .setName('Enable long press fast forward')
+                    .setDesc('Press and hold without dragging to fast forward at increased speed. Release to return to normal speed.')
+                    .addToggle(toggle => {
+                        toggle.setValue(this.plugin.settings.longPressEnabled)
+                            .onChange(async (value) => {
+                                this.plugin.settings.longPressEnabled = value;
+                                await this.plugin.saveSettings();
+                            });
+                    });
+            })
+            .addSetting(setting => {
+                setting
+                    .setName('Fast forward speed')
+                    .setDesc('Playback speed while long pressing.')
+                    .addSlider(slider => {
+                        slider.setLimits(1.5, 4, 0.25)
+                            .setValue(this.plugin.settings.longPressSpeed)
+                            .setDynamicTooltip()
+                            .onChange(async (value) => {
+                                this.plugin.settings.longPressSpeed = value;
+                                await this.plugin.saveSettings();
+                            });
+                    });
+            })
+            .addSetting(setting => {
+                setting
+                    .setName('Long press delay')
+                    .setDesc('How long to hold (in milliseconds) before fast forward kicks in.')
+                    .addSlider(slider => {
+                        slider.setLimits(200, 1000, 50)
+                            .setValue(this.plugin.settings.longPressDelay)
+                            .setDynamicTooltip()
+                            .onChange(async (value) => {
+                                this.plugin.settings.longPressDelay = value;
+                                await this.plugin.saveSettings();
+                            });
                     });
             });
 
-        new Setting(containerEl).setName('Volume (vertical drag)').setHeading();
-
-        new Setting(containerEl)
-            .setName('Enable volume control')
-            .addToggle(toggle => {
-                toggle.setValue(this.plugin.settings.volumeEnabled)
-                    .onChange(async (value) => {
-                        this.plugin.settings.volumeEnabled = value;
-                        await this.plugin.saveSettings();
+        new SettingGroup(containerEl)
+            .setHeading('Mobile fullscreen controls')
+            .addSetting(setting => {
+                setting
+                    .setName('Move controls up')
+                    .setDesc('Moves the progress bar and buttons a bit up in full screen mode to avoid being in a critical zone where system gestures might interfere.')
+                    .addToggle(toggle => {
+                        toggle.setValue(this.plugin.settings.fullscreenControlsEnabled)
+                            .onChange(async (value) => {
+                                this.plugin.settings.fullscreenControlsEnabled = value;
+                                await this.plugin.saveSettings();
+                            });
                     });
-            });
-
-        new Setting(containerEl).setName('Long press (fast forward)').setHeading();
-
-        new Setting(containerEl)
-            .setName('Enable long press fast forward')
-            .setDesc('Press and hold without dragging to fast forward at increased speed. Release to return to normal speed.')
-            .addToggle(toggle => {
-                toggle.setValue(this.plugin.settings.longPressEnabled)
-                    .onChange(async (value) => {
-                        this.plugin.settings.longPressEnabled = value;
-                        await this.plugin.saveSettings();
-                    });
-            });
-
-        new Setting(containerEl)
-            .setName('Fast forward speed')
-            .setDesc('Playback speed while long pressing.')
-            .addSlider(slider => {
-                slider.setLimits(1.5, 4, 0.25)
-                    .setValue(this.plugin.settings.longPressSpeed)
-                    .setDynamicTooltip()
-                    .onChange(async (value) => {
-                        this.plugin.settings.longPressSpeed = value;
-                        await this.plugin.saveSettings();
-                    });
-            });
-
-        new Setting(containerEl)
-            .setName('Long press delay')
-            .setDesc('How long to hold (in milliseconds) before fast forward kicks in.')
-            .addSlider(slider => {
-                slider.setLimits(200, 1000, 50)
-                    .setValue(this.plugin.settings.longPressDelay)
-                    .setDynamicTooltip()
-                    .onChange(async (value) => {
-                        this.plugin.settings.longPressDelay = value;
-                        await this.plugin.saveSettings();
-                    });
-            });
-
-        new Setting(containerEl).setName('Mobile fullscreen controls').setHeading();
-
-        new Setting(containerEl)
-            .setName('Move controls up')
-            .setDesc('Moves the progress bar and buttons a bit up in full screen mode to avoid being in a critical zone where system gestures might interfere.')
-            .addToggle(toggle => {
-                toggle.setValue(this.plugin.settings.fullscreenControlsEnabled)
-                    .onChange(async (value) => {
-                        this.plugin.settings.fullscreenControlsEnabled = value;
-                        await this.plugin.saveSettings();
-                    });
-            });
-
-        new Setting(containerEl)
-            .setName('Block input in fullscreen')
-            .setDesc('Stops touch and mouse gestures on a fullscreen video from reaching the canvas or other elements behind it. If this is off the drag gestures will e.g. pan your canvas in the background, which you normaly don\`t want.')
-            .addToggle(toggle => {
-                toggle.setValue(this.plugin.settings.blockInputInFullscreen)
-                    .onChange(async (value) => {
-                        this.plugin.settings.blockInputInFullscreen = value;
-                        await this.plugin.saveSettings();
+            })
+            .addSetting(setting => {
+                setting
+                    .setName('Block input in fullscreen')
+                    .setDesc('Stops touch and mouse gestures on a fullscreen video from reaching the canvas or other elements behind it. If this is off the drag gestures will e.g. pan your canvas in the background, which you normaly don\`t want.')
+                    .addToggle(toggle => {
+                        toggle.setValue(this.plugin.settings.blockInputInFullscreen)
+                            .onChange(async (value) => {
+                                this.plugin.settings.blockInputInFullscreen = value;
+                                await this.plugin.saveSettings();
+                            });
                     });
             });
     }
