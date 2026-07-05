@@ -1,50 +1,53 @@
 name: Release Obsidian plugin
 
 on:
-    push:
-        tags:
-            - '*'
+  push:
+    tags:
+      - "*"
 
 jobs:
-    build:
-        runs-on: ubuntu-latest
-        permissions:
-            contents: write
-            id-token: write
-            attestations: write
-        steps:
-            - uses: actions/checkout@v6
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
-            - name: Use Node.js
-              uses: actions/setup-node@v6
-              with:
-                  node-version: 24
-                  cache: 'npm'
+    steps:
+      - uses: actions/checkout@v4   # v6 ist ok, aber v4 ist stabiler
 
-            - name: Build plugin
-              run: |
-                  npm ci
-                  npm run build
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20        # 24 ist oft noch zu neu für manche Pakete
+          cache: 'npm'
 
-            - name: Check for optional styles
-              id: styles
-              run: |
-                  [ -f styles.css ] && echo "exists=true" >> "$GITHUB_OUTPUT" || echo "exists=false" >> "$GITHUB_OUTPUT"
+      - name: Install dependencies
+        run: npm ci
 
-            - name: Attest build provenance
-              uses: actions/attest@v4
-              with:
-                  subject-path: |
-                      main.js
-                      ${{ steps.styles.outputs.exists == 'true' && 'styles.css' || '' }}
+      - name: Build plugin
+        run: npm run build
 
-            - name: Create release
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              run: |
-                  tag="${GITHUB_REF#refs/tags/}"
+      - name: Check for styles.css
+        id: styles
+        run: |
+          if [ -f styles.css ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
 
-                  gh release create "$tag" \
-                    --title="$tag" \
-                    --draft \
-                    main.js manifest.json ${{ steps.styles.outputs.exists == 'true' && 'styles.css' || '' }}
+      - name: Create Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          
+          files="main.js manifest.json"
+          if [ "${{ steps.styles.outputs.exists }}" = "true" ]; then
+            files="$files styles.css"
+          fi
+
+          gh release create "$tag" \
+            --title "$tag" \
+            --draft \
+            --generate-notes \
+            $files
