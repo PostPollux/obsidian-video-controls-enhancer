@@ -1,4 +1,5 @@
 import { Plugin } from 'obsidian';
+import { ThumbnailFixManager } from './thumbnailFix';
 
 interface PluginSettings {
     doubleTapEnabled: boolean;
@@ -11,6 +12,10 @@ interface PluginSettings {
     longPressEnabled: boolean;
     longPressSpeed: number;
     longPressDelay: number;
+    thumbnailFixEnabled: boolean;
+    thumbnailFixMaxConcurrent: number;
+    thumbnailFixMaxRetries: number;
+    thumbnailFixRetryDelayMs: number;
 }
 
 const DEFAULT_SETTINGS: PluginSettings = {
@@ -24,21 +29,42 @@ const DEFAULT_SETTINGS: PluginSettings = {
     longPressEnabled: true,
     longPressSpeed: 2,
     longPressDelay: 400,
+    thumbnailFixEnabled: false,
+    thumbnailFixMaxConcurrent: 3,
+    thumbnailFixMaxRetries: 3,
+    thumbnailFixRetryDelayMs: 800,
 };
 
 export default class VideoControlsEnhancer extends Plugin {
     settings!: PluginSettings;
     private observer: MutationObserver | null = null;
+    private thumbnailFix: ThumbnailFixManager | null = null;
+    /**
+     * Lets other modules (currently the thumbnail fix) swap out the
+     * underlying <video> element for a fresh one while keeping all touch
+     * control behavior (which lives on the wrapper) working, since the
+     * enhanceVideo() closures below always refer to whatever element is
+     * currently assigned, not a fixed reference.
+     */
+    private videoReplaceHandlers = new WeakMap<HTMLVideoElement, (newVideo: HTMLVideoElement) => void>();
 
     async onload() {
         await this.loadSettings();
         this.applyFsControlsClass();
 
+        this.thumbnailFix = new ThumbnailFixManager(this);
+        this.register(() => this.thumbnailFix?.destroy());
+
+        const processVideo = (video: HTMLVideoElement) => {
+            this.enhanceVideo(video);
+            this.thumbnailFix?.handleVideo(video);
+        };
+
         this.registerMarkdownPostProcessor((element) => {
-            const videos = element.querySelectorAll<HTMLVideoElement>('video:not([data-vce])');
+            const videos = element.querySelectorAll<HTMLVideoElement>('video');
             for (let i = 0; i < videos.length; i++) {
                 const video = videos[i];
-                if (video) this.enhanceVideo(video);
+                if (video) processVideo(video);
             }
         });
 
@@ -49,13 +75,13 @@ export default class VideoControlsEnhancer extends Plugin {
                 for (let ni = 0; ni < m.addedNodes.length; ni++) {
                     const node = m.addedNodes[ni];
                     if (node instanceof HTMLElement) {
-                        if (node.tagName === 'VIDEO' && !node.hasAttribute('data-vce')) {
-                            this.enhanceVideo(node as HTMLVideoElement);
+                        if (node.tagName === 'VIDEO') {
+                            processVideo(node as HTMLVideoElement);
                         }
-                        const videos = node.querySelectorAll<HTMLVideoElement>('video:not([data-vce])');
+                        const videos = node.querySelectorAll<HTMLVideoElement>('video');
                         for (let i = 0; i < videos.length; i++) {
                             const video = videos[i];
-                            if (video) this.enhanceVideo(video);
+                            if (video) processVideo(video);
                         }
                     }
                 }
@@ -85,6 +111,19 @@ export default class VideoControlsEnhancer extends Plugin {
         document.body.classList.toggle('vce-fs-controls', this.settings.fullscreenControlsEnabled);
     }
 
+    /**
+     * Replaces a video element that is currently managed by enhanceVideo()
+     * with a fresh one (e.g. because the thumbnail fix needs a brand new
+     * element to get a clean decoder on Android). Returns true if the
+     * swap was performed.
+     */
+    replaceVideoElement(oldVideo: HTMLVideoElement, newVideo: HTMLVideoElement): boolean {
+        const handler = this.videoReplaceHandlers.get(oldVideo);
+        if (!handler) return false;
+        handler(newVideo);
+        return true;
+    }
+
     enhanceVideo(video: HTMLVideoElement) {
         if (video.hasAttribute('data-vce')) return;
         video.setAttribute('data-vce', 'true');
@@ -93,6 +132,15 @@ export default class VideoControlsEnhancer extends Plugin {
         wrapper.className = 'video-controls-enhancer-wrapper';
         video.parentNode?.insertBefore(wrapper, video);
         wrapper.appendChild(video);
+
+        const replaceVideoElement = (newVideo: HTMLVideoElement) => {
+            newVideo.setAttribute('data-vce', 'true');
+            wrapper.replaceChild(newVideo, video);
+            this.videoReplaceHandlers.delete(video);
+            video = newVideo;
+            this.videoReplaceHandlers.set(video, replaceVideoElement);
+        };
+        this.videoReplaceHandlers.set(video, replaceVideoElement);
 
         // When the video is fullscreen, events still bubble through the normal
         // DOM tree (which includes the canvas). Stop propagation of input events
@@ -575,6 +623,63 @@ class VideoControlsSettingTab extends PluginSettingTab {
                         toggle.setValue(this.plugin.settings.blockInputInFullscreen)
                             .onChange(async (value) => {
                                 this.plugin.settings.blockInputInFullscreen = value;
+                                await this.plugin.saveSettings();
+                            });
+                    });
+            });
+
+        new SettingGroup(containerEl)
+            .setHeading('Canvas thumbnail fix (mobile, experimental)')
+            .addSetting(setting => {
+                setting
+                    .setName('Fix missing video thumbnails (experimental)')
+                    .setDesc('On some Android devices, videos that all become visible at once (for example a zoomed-out canvas) can fail to render their first-frame thumbnail. This limits how many videos load at the same time and retries the ones that fail. Only has an effect on mobile; desktop is never touched. This is experimental and may not fully resolve the issue on every device.')
+                    .addToggle(toggle => {
+                        toggle.setValue(this.plugin.settings.thumbnailFixEnabled)
+                            .onChange(async (value) => {
+                                this.plugin.settings.thumbnailFixEnabled = value;
+                                await this.plugin.saveSettings();
+                            });
+                    });
+            })
+            .addSetting(setting => {
+                setting
+                    .setName('Max concurrent loads')
+                    .setDesc('How many videos are allowed to try to load a thumbnail at the same time. Lower values reduce resource contention but load thumbnails more slowly overall.')
+                    .addSlider(slider => {
+                        slider.setLimits(1, 6, 1)
+                            .setValue(this.plugin.settings.thumbnailFixMaxConcurrent)
+                            .setDynamicTooltip()
+                            .onChange(async (value) => {
+                                this.plugin.settings.thumbnailFixMaxConcurrent = value;
+                                await this.plugin.saveSettings();
+                            });
+                    });
+            })
+            .addSetting(setting => {
+                setting
+                    .setName('Max retries per video')
+                    .setDesc('How many times to retry loading a thumbnail before giving up on a video.')
+                    .addSlider(slider => {
+                        slider.setLimits(0, 8, 1)
+                            .setValue(this.plugin.settings.thumbnailFixMaxRetries)
+                            .setDynamicTooltip()
+                            .onChange(async (value) => {
+                                this.plugin.settings.thumbnailFixMaxRetries = value;
+                                await this.plugin.saveSettings();
+                            });
+                    });
+            })
+            .addSetting(setting => {
+                setting
+                    .setName('Retry cooldown (ms)')
+                    .setDesc('How long to wait before retrying a video that failed to produce a thumbnail.')
+                    .addSlider(slider => {
+                        slider.setLimits(200, 3000, 100)
+                            .setValue(this.plugin.settings.thumbnailFixRetryDelayMs)
+                            .setDynamicTooltip()
+                            .onChange(async (value) => {
+                                this.plugin.settings.thumbnailFixRetryDelayMs = value;
                                 await this.plugin.saveSettings();
                             });
                     });

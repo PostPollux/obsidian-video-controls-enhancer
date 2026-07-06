@@ -12,6 +12,18 @@
     width: 100% !important;
 }
 
+/* Applied while the thumbnail-fix feature has temporarily stripped a
+   video's src (waiting for its turn, or resetting for a retry). Hides
+   whatever stale frame/broken-icon the browser may still be showing so
+   it visibly resets to blank instead of looking stuck. */
+.video-controls-enhancer-wrapper.vce-thumb-pending {
+    background: var(--background-modifier-border);
+}
+
+.video-controls-enhancer-wrapper.vce-thumb-pending video {
+    visibility: hidden;
+}
+
 .vce-overlay {
     position: fixed;
     transform: translate(-50%, -50%);
