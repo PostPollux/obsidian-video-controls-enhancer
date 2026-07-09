@@ -181,8 +181,6 @@ export default class VideoControlsEnhancer extends Plugin {
         });
 
         let lastTapTime = 0;
-        let lastTapX = 0;
-        let lastTapY = 0;
         let dragMode: 'none' | 'scrub' | 'volume' = 'none';
         let dragStartX = 0;
         let dragStartY = 0;
@@ -195,6 +193,7 @@ export default class VideoControlsEnhancer extends Plugin {
         let longPressTimer: number | null = null;
         let isLongPressing = false;
         let justLongPressed = false;
+        let activeTouchId: number | null = null;
 
         const formatTime = (s: number): string => {
             if (!isFinite(s) || s <= 0) return '0:00';
@@ -290,15 +289,6 @@ export default class VideoControlsEnhancer extends Plugin {
             if (!this.settings.doubleTapEnabled) return false;
             const now = Date.now();
             if (now - lastTapTime < 400) {
-                const dx = clientX - lastTapX;
-                const dy = clientY - lastTapY;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist > 40) {
-                    lastTapTime = now;
-                    lastTapX = clientX;
-                    lastTapY = clientY;
-                    return false;
-                }
                 const rect = getVideoRect();
                 const isRightSide = clientX > rect.left + rect.width / 2;
                 const direction = isRightSide ? 1 : -1;
@@ -313,8 +303,6 @@ export default class VideoControlsEnhancer extends Plugin {
                 return true;
             }
             lastTapTime = now;
-            lastTapX = clientX;
-            lastTapY = clientY;
             return false;
         };
 
@@ -334,7 +322,7 @@ export default class VideoControlsEnhancer extends Plugin {
             const deltaY = clientY - dragStartY;
 
             if (dragMode === 'none') {
-                if (Math.abs(deltaX) < 12 && Math.abs(deltaY) < 12) return;
+                if (Math.abs(deltaX) < 18 && Math.abs(deltaY) < 18) return;
                 cancelLongPressTimer();
                 const preferScrub = Math.abs(deltaX) >= Math.abs(deltaY);
                 if (preferScrub && this.settings.scrubEnabled) {
@@ -462,17 +450,30 @@ export default class VideoControlsEnhancer extends Plugin {
             const t = e.touches[0];
             if (!t) return;
             if (isInControls(t.clientY)) return;
+            if (e.touches.length > 1) {
+                cancelLongPressTimer();
+                lastTapTime = 0;
+                activeTouchId = null;
+                endDrag();
+                return;
+            }
             if (tryDoubleTap(t.clientX, t.clientY)) {
                 e.preventDefault();
                 return;
             }
+            activeTouchId = t.identifier;
             beginDrag(t.clientX, t.clientY);
             startLongPressTimer(t.clientX, t.clientY);
         }, { passive: false });
 
         wrapper.addEventListener('touchmove', (e: TouchEvent) => {
+            if (e.touches.length > 1) {
+                activeTouchId = null;
+                endDrag();
+                return;
+            }
             const t = e.touches[0];
-            if (!t) return;
+            if (!t || t.identifier !== activeTouchId) return;
             if (isLongPressing) {
                 e.preventDefault();
                 return;
@@ -480,7 +481,18 @@ export default class VideoControlsEnhancer extends Plugin {
             updateDrag(t.clientX, t.clientY);
         }, { passive: false });
 
-        wrapper.addEventListener('touchend', () => {
+        wrapper.addEventListener('touchend', (e: TouchEvent) => {
+            const ended = e.changedTouches[0];
+            if (ended && activeTouchId !== null && ended.identifier !== activeTouchId) {
+                return;
+            }
+            activeTouchId = null;
+            endDrag();
+            endLongPress();
+        });
+
+        wrapper.addEventListener('touchcancel', () => {
+            activeTouchId = null;
             endDrag();
             endLongPress();
         });
