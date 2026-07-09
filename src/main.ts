@@ -181,6 +181,8 @@ export default class VideoControlsEnhancer extends Plugin {
         });
 
         let lastTapTime = 0;
+        let lastTapX = 0;
+        let lastTapY = 0;
         let dragMode: 'none' | 'scrub' | 'volume' = 'none';
         let dragStartX = 0;
         let dragStartY = 0;
@@ -288,6 +290,15 @@ export default class VideoControlsEnhancer extends Plugin {
             if (!this.settings.doubleTapEnabled) return false;
             const now = Date.now();
             if (now - lastTapTime < 400) {
+                const dx = clientX - lastTapX;
+                const dy = clientY - lastTapY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist > 40) {
+                    lastTapTime = now;
+                    lastTapX = clientX;
+                    lastTapY = clientY;
+                    return false;
+                }
                 const rect = getVideoRect();
                 const isRightSide = clientX > rect.left + rect.width / 2;
                 const direction = isRightSide ? 1 : -1;
@@ -302,6 +313,8 @@ export default class VideoControlsEnhancer extends Plugin {
                 return true;
             }
             lastTapTime = now;
+            lastTapX = clientX;
+            lastTapY = clientY;
             return false;
         };
 
@@ -321,7 +334,7 @@ export default class VideoControlsEnhancer extends Plugin {
             const deltaY = clientY - dragStartY;
 
             if (dragMode === 'none') {
-                if (Math.abs(deltaX) < 5 && Math.abs(deltaY) < 5) return;
+                if (Math.abs(deltaX) < 12 && Math.abs(deltaY) < 12) return;
                 cancelLongPressTimer();
                 const preferScrub = Math.abs(deltaX) >= Math.abs(deltaY);
                 if (preferScrub && this.settings.scrubEnabled) {
